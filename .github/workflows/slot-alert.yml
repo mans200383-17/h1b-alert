@@ -1,0 +1,39 @@
+name: H-1B slot alert
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"     # every 5 min (GitHub may run it 5-15 min late)
+  workflow_dispatch:           # lets you press "Run workflow" to test
+
+concurrency:
+  group: slot-alert
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore memory of what was already seen
+        uses: actions/cache/restore@v4
+        with:
+          path: h1b_alert_state.json
+          key: slot-state-${{ github.run_id }}
+          restore-keys: slot-state-
+
+      - name: Check tracker sites
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          LATEST_USEFUL_DATE: ${{ vars.LATEST_USEFUL_DATE }}
+          INCLUDE_VAC: ${{ vars.INCLUDE_VAC }}
+        run: python h1b_slot_alert.py --once
+
+      - name: Save memory for next run
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: h1b_alert_state.json
+          key: slot-state-${{ github.run_id }}
